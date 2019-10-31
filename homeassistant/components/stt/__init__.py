@@ -183,8 +183,8 @@ class SpeechToTextView(HomeAssistantView):
                 "languages": stt_provider.supported_languages,
                 "formats": stt_provider.supported_formats,
                 "codecs": stt_provider.supported_codecs,
-                "samplerate": stt_provider.supported_samplerates,
-                "bitrate": stt_provider.supported_bitrates,
+                "samplerates": stt_provider.supported_samplerates,
+                "bitrates": stt_provider.supported_bitrates,
             }
         )
 
