@@ -20,7 +20,14 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.setup import async_prepare_setup_platform
 
-from .const import DOMAIN, AudioCodecs, AudioFormats, AudioBitrates, AudioSamplerates
+from .const import (
+    DOMAIN,
+    AudioCodecs,
+    AudioFormats,
+    AudioBitrates,
+    AudioSamplerates,
+    SpeechResultState,
+)
 
 # mypy: allow-untyped-defs, no-check-untyped-defs
 
@@ -65,12 +72,21 @@ async def async_setup(hass: HomeAssistantType, config):
 
 @attr.s
 class SpeechMetadata:
+    """Metadata of audio stream."""
 
     lanugage: str = attr.ib()
     format: AudioFormats = attr.ib()
     codec: AudioCodecs = attr.ib()
-    bitrate: int = attr.ib(converter=int)
-    samplerate: int = attr.ib(converter=int)
+    bitrate: AudioBitrates = attr.ib(converter=int)
+    samplerate: AudioSamplerates = attr.ib(converter=int)
+
+
+@attr.s
+class SpeechResult:
+    """Result of audio Speech."""
+
+    text: str = attr.ib()
+    state: SpeechResultState = attr.ib()
 
 
 class Provider(ABC):
@@ -107,7 +123,7 @@ class Provider(ABC):
     @abstractmethod
     async def async_process_audio_stream(
         self, metadata: SpeechMetadata, stream: StreamReader
-    ) -> Optional[str]:
+    ) -> SpeechResult:
         """Process an audio stream to STT service.
 
         Only streaming of content are allow!
@@ -166,11 +182,12 @@ class SpeechToTextView(HomeAssistantView):
             raise HTTPNotImplemented()
 
         # Process audio stream
-        text = await stt_provider.async_process_audio_stream(metadata, request.content)
-        if text is None:
-            return web.Response(status=400)
+        result = await stt_provider.async_process_audio_stream(
+            metadata, request.content
+        )
 
-        return web.Response(text=text, status=200)
+        # Return result
+        return self.json_message(attr.asdict(result))
 
     async def get(self, request: web.Request, provider: str) -> web.Response:
         """Return provider specific audio information."""

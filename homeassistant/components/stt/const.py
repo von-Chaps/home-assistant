@@ -39,3 +39,10 @@ class AudioSamplerates(Enum):
     SAMPLERATE_37800 = 37800
     SAMPLERATE_44100 = 44100
     SAMPLERATE_48000 = 48000
+
+
+class SpeechResultState(Enum):
+    """Result state of speech."""
+
+    SUCCESS = "success"
+    ERROR = "error"
