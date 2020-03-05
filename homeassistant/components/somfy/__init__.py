@@ -1,18 +1,14 @@
-"""
-Support for Somfy hubs.
-
-For more details about this component, please refer to the documentation at
-https://home-assistant.io/integrations/somfy/
-"""
+"""Support for Somfy hubs."""
 import asyncio
-import logging
 from datetime import timedelta
+import logging
 
+from requests import HTTPError
 import voluptuous as vol
 
-from homeassistant.helpers import config_validation as cv, config_entry_oauth2_flow
 from homeassistant.components.somfy import config_flow
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import config_entry_oauth2_flow, config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util import Throttle
@@ -25,12 +21,13 @@ DEVICES = "devices"
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(seconds=10)
+SCAN_INTERVAL = timedelta(seconds=30)
 
 DOMAIN = "somfy"
 
 CONF_CLIENT_ID = "client_id"
 CONF_CLIENT_SECRET = "client_secret"
+CONF_OPTIMISTIC = "optimisitic"
 
 SOMFY_AUTH_CALLBACK_PATH = "/auth/somfy/callback"
 SOMFY_AUTH_START = "/auth/somfy"
@@ -41,13 +38,14 @@ CONFIG_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_CLIENT_ID): cv.string,
                 vol.Required(CONF_CLIENT_SECRET): cv.string,
+                vol.Optional(CONF_OPTIMISTIC, default=False): cv.boolean,
             }
         )
     },
     extra=vol.ALLOW_EXTRA,
 )
 
-SOMFY_COMPONENTS = ["cover"]
+SOMFY_COMPONENTS = ["cover", "switch"]
 
 
 async def async_setup(hass, config):
@@ -56,6 +54,8 @@ async def async_setup(hass, config):
 
     if DOMAIN not in config:
         return True
+
+    hass.data[DOMAIN][CONF_OPTIMISTIC] = config[DOMAIN][CONF_OPTIMISTIC]
 
     config_flow.SomfyFlowHandler.async_register_implementation(
         hass,
@@ -156,13 +156,8 @@ class SomfyEntity(Entity):
 @Throttle(SCAN_INTERVAL)
 async def update_all_devices(hass):
     """Update all the devices."""
-    from requests import HTTPError
-    from oauthlib.oauth2 import TokenExpiredError
-
     try:
         data = hass.data[DOMAIN]
         data[DEVICES] = await hass.async_add_executor_job(data[API].get_devices)
-    except TokenExpiredError:
-        _LOGGER.warning("Cannot update devices due to expired token")
-    except HTTPError:
-        _LOGGER.warning("Cannot update devices")
+    except HTTPError as err:
+        _LOGGER.warning("Cannot update devices: %s", err.response.status_code)
